@@ -13,6 +13,18 @@ import (
 )
 
 func main() {
+	stat, _ := os.Stdin.Stat()
+	var data []byte
+	if (stat.Mode() & os.ModeCharDevice) == 0 {
+		// Standard input is available (piped input)
+		//fmt.Println("Reading from standard input...")
+		var e error
+		data, e = io.ReadAll(os.Stdin)
+		if e != nil {
+			fmt.Fprintln(os.Stderr, "Error reading standard input:", e)
+		}
+	}
+
 	isNumBytes := flag.Bool("c", false, "get byte count")
 	isLineCount := flag.Bool("l", false, "get line count")
 	isWordCount := flag.Bool("w", false, "get word count")
@@ -38,50 +50,60 @@ func main() {
 		*isWordCount = true
 	}
 	// lets extract filename args
-	for _, filename := range filenames {
-		// read files
-		//fileInfo, err := os.Stat(filename)
-
+	if len(filenames) == 0 || filenames == nil && data != nil {
 		var result []string
-
-		file, err := os.Open(filename)
-		if err != nil {
-			fmt.Println("Error:", err)
-			continue
-		}
-		fileContent, err := io.ReadAll(file)
-
-		for _, flagName := range flags {
-			if flagName == "-c" && *isNumBytes {
-				result = append(
-					result,
-					strconv.Itoa(len(fileContent)),
-				)
-			}
-			if flagName == "-l" && *isLineCount {
-				result = append(
-					result,
-					strconv.Itoa(getLineCount(fileContent)),
-				)
-			}
-			if flagName == "-w" && *isWordCount {
-				result = append(
-					result,
-					strconv.Itoa(getWordCount(fileContent)),
-				)
-			}
-			if flagName == "-m" && *isCharCount {
-				result = append(
-					result,
-					strconv.Itoa(getCharCount(fileContent)),
-				)
-			}
-
-		}
+		result = processFlags(flags, isNumBytes, result, data, isLineCount, isWordCount, isCharCount)
 		//result = append(result, filename)
 		final := strings.Join(result, "   ")
-		fmt.Println("    " + final + " " + filename)
+		fmt.Println("    " + final)
+	} else if filenames != nil || len(filenames) == 0 {
+		for _, filename := range filenames {
+			var result []string
+
+			file, err := os.Open(filename)
+			if err != nil {
+				fmt.Println("Error:", err)
+				continue
+			}
+			fileContent, err := io.ReadAll(file)
+
+			result = processFlags(flags, isNumBytes, result, fileContent, isLineCount, isWordCount, isCharCount)
+			final := strings.Join(result, "   ")
+			fmt.Println("    " + final + " " + filename)
+		}
 	}
+
+}
+
+func processFlags(flags []string, isNumBytes *bool, result []string, fileContent []byte, isLineCount *bool, isWordCount *bool, isCharCount *bool) []string {
+	for _, flagName := range flags {
+		if flagName == "-c" && *isNumBytes {
+			result = append(
+				result,
+				strconv.Itoa(len(fileContent)),
+			)
+		}
+		if flagName == "-l" && *isLineCount {
+			result = append(
+				result,
+				strconv.Itoa(getLineCount(fileContent)),
+			)
+		}
+		if flagName == "-w" && *isWordCount {
+			result = append(
+				result,
+				strconv.Itoa(getWordCount(fileContent)),
+			)
+		}
+		if flagName == "-m" && *isCharCount {
+			result = append(
+				result,
+				strconv.Itoa(getCharCount(fileContent)),
+			)
+		}
+
+	}
+	return result
 }
 
 func getCharCount(content []byte) int {
